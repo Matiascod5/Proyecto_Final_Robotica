@@ -60,7 +60,11 @@ class RobotNavigator:
         self.prev_robot_pos = Position(0, 0)
         self.evasion_counter = 0 
         self.total_distance = 0.0 # Acumulador para la distancia recorrida
-        
+        self.total_planning_time = 0.0
+        self.planning_runs = 0
+        self.last_path_length = 0
+        self.explored_grid = np.full((GRID_SIZE, GRID_SIZE), False, dtype=bool)
+
         self._setup_devices()
         print(f"Controlador iniciado. Objetivo: ({self.goal_pos.x:.2f}, {self.goal_pos.y:.2f})")
 
@@ -195,7 +199,7 @@ class RobotNavigator:
                     planning_counter += 1
                     if planning_counter > 20 or not self.path:
                         # Replanifica la ruta periódicamente o si no tiene una.
-                        # print("Planificando ruta...")
+                        print("Planificando ruta...")
                         grid = np.zeros((GRID_SIZE, GRID_SIZE), dtype=int)
                         ranges = self.lidar.getRangeImage()
                         resolution = self.lidar.getHorizontalResolution(); fov = self.lidar.getFov()
@@ -205,38 +209,60 @@ class RobotNavigator:
                             if math.isinf(dist) or math.isnan(dist) or dist > 3.0: continue
                             obs_x = robot_pos.x + dist * math.cos(angle); obs_y = robot_pos.y + dist * math.sin(angle)
                             obs_cell = self.world_to_grid(obs_x, obs_y); grid[obs_cell.x, obs_cell.y] = 1
-                        
+                            self.explored_grid[obs_cell.x, obs_cell.y] = True
+
                         start = self.world_to_grid(robot_pos.x, robot_pos.y)
                         goal = self.world_to_grid(self.goal_pos.x, self.goal_pos.y)
                         grid[start.x, start.y] = 0 # Asegura que la celda de inicio esté libre.
 
+                        # Medir tiempo de planificación
+                        planning_start_time = self.robot.getTime()
                         self.path = self.plan_path_astar(grid, start, goal)
-                        if self.path: self.current_path_index = 0
+                        planning_end_time = self.robot.getTime()
+                        self.total_planning_time += (planning_end_time - planning_start_time)
+                        self.planning_runs += 1
+
+                        if self.path: 
+                             self.current_path_index = 0
+                             self.last_path_length = len(self.path)
+                             print(f"Nueva ruta encontrada con {len(self.path)} puntos.")
+                        else:
+                             print("No se encontró ruta.")
                         planning_counter = 0
 
                     if self.path:
                         self.follow_path(robot_pos, robot_orientation) # Si hay ruta, síguela.
                     else:
+                        print("Sin ruta, explorando...")
                         self.set_speeds(SPEED * 0.5, SPEED * 0.5) # Si no, explora un poco.
             
             elif self.robot_state == RobotState.AVOIDING_OBSTACLE:
                 # Maniobra de evasión forzada: gira durante un tiempo fijo para escapar.
                 if self.evasion_counter > 0:
+                    print(f"EVASIÓN: Girando... ({self.evasion_counter}/{ESCAPE_STEPS})")
                     self.set_speeds(EVASION_TURN_SPEED, -EVASION_TURN_SPEED) # Gira a la derecha
                     self.evasion_counter -= 1
                 else:
                     # Cuando termina el giro, vuelve a la navegación normal.
                     self.robot_state = RobotState.NAVIGATING
+                    print("-> Fin de la maniobra de evasión. Volviendo a NAVEGACIÓN.")
                     self.set_speeds(0, 0)
             
             elif self.robot_state == RobotState.GOAL_REACHED:
                 # Ha llegado al destino. Imprime métricas y termina.
                 navigation_time = self.robot.getTime() - start_time
-                print("\n" + "="*30)
+                avg_planning_time_ms = (self.total_planning_time / self.planning_runs) * 1000 if self.planning_runs > 0 else 0
+                explored_cells = np.count_nonzero(self.explored_grid)
+                explored_percentage = (explored_cells / (GRID_SIZE * GRID_SIZE)) * 100
+
+                print("\n" + "="*40)
                 print("¡OBJETIVO FINAL ALCANZADO!")
-                print(f"  Tiempo total de navegación: {navigation_time:.2f} segundos")
-                print(f"  Distancia total recorrida: {self.total_distance:.2f} metros")
-                print("="*30 + "\n")
+                print("--- Métricas de Desempeño ---")
+                print(f"Tiempo total de navegación: {navigation_time:.2f} segundos")
+                print(f"Longitud del path (celdas): {self.last_path_length}")
+                print(f"Tiempo de planificación (A*): {avg_planning_time_ms:.4f} milisegundos")
+                print(f"Porcentaje del mapa explorado: {explored_percentage:.2f} %")
+                print("="*40 + "\n")
                 self.set_speeds(0, 0); break
             
             # --- 3. ACTUALIZACIÓN: Guardar estado para el próximo ciclo ---
