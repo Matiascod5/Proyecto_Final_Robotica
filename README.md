@@ -25,7 +25,7 @@ Este repositorio contiene la simulación de un robot móvil desarrollada como pa
 
 ##  Video de demostración
 
-Dentro de la carpeta `main` se encuentra `ROBOTICK.mp4`, el **video de demostración** que muestra el funcionamiento del robot móvil en el entorno simulado.
+Dentro de la carpeta `main` se encuentra `Video_Final_Robotica.mp4`, el **video de demostración** que muestra el funcionamiento del robot móvil en el entorno simulado.
 
 ##  Información adicional
 
