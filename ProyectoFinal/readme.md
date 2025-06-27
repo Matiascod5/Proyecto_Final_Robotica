@@ -3,7 +3,7 @@ Webots
 
 ## Descripción del Proyecto
 
-El presente proyecto tiene como objetivo el desarrollo e implementación de un robot móvil autónomo en el simulador Webots, utilizando control cinemático diferencial y sensores para la percepción del entorno.
+El presente proyecto tiene como objetivo el desarrollo e implementación de un robot móvil autónomo en el simulador Webots, utilizando control cinemático diferencial y sensores para la percepción del entorno, por último mencionar que el entorno que se hizo el trabajo hecho el robot móvil fue en lenguaje Python.
 
 **El robot es capaz de:**
 
